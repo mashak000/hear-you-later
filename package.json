@@ -1,0 +1,24 @@
+{
+  "name": "hear-you-later",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/bot.js",
+  "scripts": {
+    "start": "node src/bot.js",
+    "dev": "nodemon src/bot.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.940.0",
+    "@grammyjs/i18n": "^1.1.2",
+    "axios": "^1.13.2",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.2.3",
+    "googleapis": "^166.0.0",
+    "grammy": "^1.38.4",
+    "nodemon": "^3.1.11"
+  }
+}
