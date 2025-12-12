@@ -245,7 +245,7 @@ bot.on('message', async (ctx) => {
       }
     } else if (session.step === 'comment') {
       session.formData.comment = ctx.message.text;
-      if (!session.formData.file) {
+      if (!session.formData.temp_audio) {
         ctx.reply(ctx.t('send_audio'));
         session.step = 'waiting_for_audio';
       } else {
