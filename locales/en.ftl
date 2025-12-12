@@ -7,7 +7,7 @@ about =  Welcome!
          <b>Participation Rules:</b>
 
          1. The audio must be your own work.
-         2. You may send a voice message or upload a pre-recorded audio file.
+         2. You may send a voice message or upload a pre-recorded audio file in formats .mp3, .ogg или .oga.
          3. Content containing violence, threats, or hate speech is not allowed.
          4. The maximum file size is 15 MB.
          5. The maximum duration is 5 minutes.
