@@ -16,8 +16,6 @@ const i18n = new I18n({
   directory: 'locales',
 });
 
-bot.use(i18n);
-
 // нужен для хранения сессии заявки мидлвара
 bot.use(
   session({
@@ -27,6 +25,8 @@ bot.use(
     }),
   })
 );
+
+bot.use(i18n);
 
 bot.command('start', async (ctx) => {
   const keyboard = new InlineKeyboard()
@@ -43,11 +43,12 @@ bot.callbackQuery(['lang_ru', 'lang_en'], async (ctx) => {
 
   await ctx.i18n.setLocale(newLang);
   await ctx.answerCallbackQuery();
-
+  ctx.session.step = 'about';
   const keyboard = new InlineKeyboard().text(ctx.t('apply'), 'apply');
 
   try {
     await ctx.reply(ctx.t('about'), {
+      parse_mode: 'HTML',
       reply_markup: keyboard,
     });
   } catch (error) {
@@ -59,9 +60,7 @@ bot.callbackQuery(['lang_ru', 'lang_en'], async (ctx) => {
     } else {
       console.error('Error sending message:', error);
       try {
-        await ctx.reply(
-          'Произошла ошибка при отправке сообщения. Пожалуйста, попробуйте снова.'
-        );
+        await ctx.reply(ctx.t('general_error'));
       } catch (err) {
         console.error('Error sending fallback message:', err);
       }
@@ -69,11 +68,11 @@ bot.callbackQuery(['lang_ru', 'lang_en'], async (ctx) => {
   }
 });
 
-bot.callbackQuery('apply', (ctx) => {
+bot.callbackQuery('apply', async (ctx) => {
   try {
     ctx.answerCallbackQuery();
     ctx.session.step = 'bioInfo';
-    ctx.reply(ctx.t('author'));
+    await ctx.reply(ctx.t('author'));
   } catch (error) {
     console.log(error);
   }
@@ -90,12 +89,13 @@ async function showEditMenu(ctx) {
       .row()
       .text(ctx.t('edit_audio'), 'editAudio')
       .row()
-      .text('Сохранить и отправить', 'saveAndSend');
-    const allInfoRU = `Имя: ${ctx.session.formData.author}\nСсылка на соцсеть: ${ctx.session.formData.socialMedia}\nНазвание: ${ctx.session.formData.voiceName}\nКомментарий: ${ctx.session.formData.comment}\n`;
+      .text(ctx.t('save'), 'saveAndSend');
+    const allInfoRU = `Имя/псевдоним: ${ctx.session.formData.author}\nСоц.сеть: ${ctx.session.formData.socialMedia}\nНазвание: ${ctx.session.formData.voiceName}\nКомментарий: ${ctx.session.formData.comment}\n\n\n Выберите, что нужно отредактировать:`;
     // переписать на английский
-    const allInfoEN = `Имя: ${ctx.session.formData.author}\nСсылка на соцсеть: ${ctx.session.formData.socialMedia}\nНазвание: ${ctx.session.formData.voiceName}\nКомментарий: ${ctx.session.formData.comment}\n`;
-    const allInfo = ctx.i18n.locale === 'ru' ? allInfoRU : allInfoEN;
-    await ctx.reply(`${allInfo}\n\n Выберите, что нужно отредактировать:`, {
+    const allInfoEN = `Name/Pseudonym: ${ctx.session.formData.author}\nSocial media: ${ctx.session.formData.socialMedia}\nTitle: ${ctx.session.formData.voiceName}\nComment: ${ctx.session.formData.comment}\n\n\n Choose what to edit:`;
+    const allInfo =
+      (await ctx.i18n.getLocale()) === 'ru' ? allInfoRU : allInfoEN;
+    await ctx.reply(`${allInfo}`, {
       reply_markup: keyboard,
     });
   } catch (error) {
@@ -103,7 +103,7 @@ async function showEditMenu(ctx) {
   }
 }
 
-bot.callbackQuery("edit", async (ctx) => {
+bot.callbackQuery('edit', async (ctx) => {
   try {
     ctx.answerCallbackQuery();
     await showEditMenu(ctx);
@@ -112,45 +112,45 @@ bot.callbackQuery("edit", async (ctx) => {
   }
 });
 
-bot.callbackQuery("editBio", async (ctx) => {
+bot.callbackQuery('editBio', async (ctx) => {
   try {
-    ctx.session.step = "bioInfo";
+    ctx.session.step = 'bioInfo';
     ctx.reply(ctx.t('author'));
   } catch (error) {
     console.log(error);
   }
 });
 
-bot.callbackQuery("editSocialMedia", async (ctx) => {
+bot.callbackQuery('editSocialMedia', async (ctx) => {
   try {
-    ctx.session.step = "socialMedia";
+    ctx.session.step = 'socialMedia';
     ctx.reply(ctx.t('social_media'));
   } catch (error) {
     console.log(error);
   }
 });
 
-bot.callbackQuery("editVoiceName", (ctx) => {
+bot.callbackQuery('editVoiceName', (ctx) => {
   try {
-    ctx.session.step = "voiceName";
+    ctx.session.step = 'voiceName';
     ctx.reply(ctx.t('voice_name'));
   } catch (error) {
     console.log(error);
   }
 });
 
-bot.callbackQuery("editComment", async (ctx) => {
+bot.callbackQuery('editComment', async (ctx) => {
   try {
-    ctx.session.step = "comment";
+    ctx.session.step = 'comment';
     ctx.reply(ctx.t('comment'));
   } catch (error) {
     console.log(error);
   }
 });
 
-bot.callbackQuery("editAudio", async (ctx) => {
+bot.callbackQuery('editAudio', async (ctx) => {
   try {
-    ctx.session.step = "waiting_for_audio";
+    ctx.session.step = 'waiting_for_audio';
     ctx.session.formData.temp_audio = null;
     ctx.reply(ctx.t('send_audio'));
   } catch (error) {
@@ -180,21 +180,17 @@ bot.on(['message:audio', 'message:voice'], async (ctx) => {
     fileExtension = 'ogg';
     fileSize = ctx.message.voice.file_size;
   } else {
-    await ctx.reply(
-      '❌ Неверный формат файла. Пожалуйста, отправьте голосовое сообщение или аудио.'
-    );
+    await ctx.reply(ctx.t('format_error'));
     return;
   }
 
   if (ctx.message.audio && !['mp3', 'ogg', 'oga'].includes(fileExtension)) {
-    await ctx.reply(
-      '❌ Разрешены только файлы с расширением .mp3, .ogg или .oga'
-    );
+    await ctx.reply(ctx.t('ext_error'));
     return;
   }
 
   if (fileSize && fileSize > MAX_SIZE) {
-    await ctx.reply('❌ Файл слишком большой. Максимальный размер — 15 МБ.');
+    await ctx.reply(ctx.t('size_error'));
     return;
   }
 
@@ -208,7 +204,7 @@ bot.on(['message:audio', 'message:voice'], async (ctx) => {
     ctx.t('ready'),
     'confirmSubmission'
   );
-  ctx.reply('!', {
+  ctx.reply(ctx.t('received'), {
     reply_markup: keyboard,
   });
   ctx.session.step = 'confirmSubmission';
@@ -227,7 +223,7 @@ bot.on('message', async (ctx) => {
         ctx.reply(ctx.t('social_media'));
         session.step = 'socialMedia';
       } else {
-        showEditMenu(ctx)
+        showEditMenu(ctx);
       }
     } else if (session.step === 'socialMedia') {
       session.formData.socialMedia = ctx.message.text;
@@ -236,7 +232,7 @@ bot.on('message', async (ctx) => {
         ctx.reply(ctx.t('voice_name'));
         session.step = 'voiceName';
       } else {
-        showEditMenu(ctx)
+        showEditMenu(ctx);
       }
     } else if (session.step === 'voiceName') {
       session.formData.voiceName = ctx.message.text;
@@ -245,7 +241,7 @@ bot.on('message', async (ctx) => {
         ctx.reply(ctx.t('comment'));
         session.step = 'comment';
       } else {
-        showEditMenu(ctx)
+        showEditMenu(ctx);
       }
     } else if (session.step === 'comment') {
       session.formData.comment = ctx.message.text;
@@ -253,12 +249,10 @@ bot.on('message', async (ctx) => {
         ctx.reply(ctx.t('send_audio'));
         session.step = 'waiting_for_audio';
       } else {
-        showEditMenu(ctx)
+        showEditMenu(ctx);
       }
     } else if (session.step === 'waiting_for_audio') {
-      ctx.reply(
-        '❌ Пожалуйста, отправьте голосовое сообщение или аудиофайл.'
-      );
+      ctx.reply(ctx.t('please_send_audio'));
     }
   } catch (error) {
     console.log(error);
@@ -273,15 +267,16 @@ bot.callbackQuery('confirmSubmission', async (ctx) => {
       const keyboard = new InlineKeyboard()
         .text(ctx.t('edit'), 'edit')
         .text(ctx.t('save'), 'saveAndSend');
-      const allInfoRU = `Имя: ${session.formData.author}\nлаша на соцсеть: ${ctx.session.formData.socialMedia}\nНазвание работы: ${ctx.session.formData.voiceName}\nОписание работы: ${session.formData.comment}\n\nНажимая отправить вы соглашаетесь на предоставление информации организаторам опенколла.`;
+      const allInfoRU = `Имя/псевдоним: ${session.formData.author}\nСоц. сеть: ${ctx.session.formData.socialMedia}\nНазвание: ${ctx.session.formData.voiceName}\nКомментарий: ${session.formData.comment}\nФайл загружен\n\nНажимая «Отправить в будущее», вы разрешаете передать данные организаторам и согласны с тем, что ваша аудиозапись станет частью открытого архива.`;
       // переписать на английский
-      const allInfoEN = `Имя: ${session.formData.author}\nлаша на соцсеть: ${ctx.session.formData.socialMedia}\nНазвание работы: ${ctx.session.formData.voiceName}\nОписание работы: ${session.formData.comment}\n\nНажимая отправить вы соглашаетесь на предоставление информации организаторам опенколла.`;
-      const allInfo = ctx.i18n.locale === 'ru' ? allInfoRU : allInfoEN;
+      const allInfoEN = `Name/Pseudonym: ${session.formData.author}\nSocial media: ${ctx.session.formData.socialMedia}\nTitle: ${ctx.session.formData.voiceName}\nComment: ${session.formData.comment}\nFile uploaded\n\nBy clicking “Send to the future”, you give permission to share your data with the organizers and agree that your audio recording will become part of a public archive.`;
+      const allInfo =
+        (await ctx.i18n.getLocale()) === 'ru' ? allInfoRU : allInfoEN;
       ctx.reply(allInfo, {
         reply_markup: keyboard,
       });
     } else {
-      ctx.reply('Пожалуйста, загрузите аудиофайл перед отправкой заявки.');
+      ctx.reply(ctx.t('audio_before_procede'));
       session.step = 'waiting_for_audio';
     }
   } catch (error) {
@@ -306,9 +301,7 @@ bot.callbackQuery('saveAndSend', async (ctx) => {
         const fileBuffer = Buffer.from(response.data);
 
         if (fileBuffer.length > MAX_SIZE) {
-          await ctx.reply(
-            '❌ Файл слишком большой. Максимальный размер — 15 МБ.'
-          );
+          await ctx.reply(ctx.t('size_error'));
           return;
         }
 
@@ -335,17 +328,17 @@ bot.callbackQuery('saveAndSend', async (ctx) => {
         }
         await appendToSheet(values);
         session.step = 'finalStep';
-        const keyboard = new InlineKeyboard().url(
-          'Телеграм канал collective(ism)',
-          'https://t.me/collective_ism'
-        );
-        ctx.reply(ctx.t('submission_successful'), { reply_markup: keyboard });
+        const keyboard = new InlineKeyboard()
+          .url('tg channel', 'https://t.me/collective_ism')
+          .url('instagram', 'https://www.instagram.com/collective_ism');
+        ctx.reply(ctx.t('submission_successful'), {
+          parse_mode: 'HTML',
+          reply_markup: keyboard,
+        });
         session.formData = {};
       } catch (error) {
         console.error(error);
-        await ctx.reply(
-          '❌ Произошла ошибка при загрузке файла. Попробуйте ещё раз.'
-        );
+        await ctx.reply(ctx.t('upload_error'));
       }
     }
   } catch (error) {}
@@ -353,9 +346,7 @@ bot.callbackQuery('saveAndSend', async (ctx) => {
 
 bot.command('help', async (ctx) => {
   try {
-    ctx.reply(
-      'Если у вас возникли трудности c отправкой заявки на опенколл, попробуйте очистить историю диалога и заполнить информацию еще раз, если и это не помогло, напишите @mashak000'
-    );
+    ctx.reply(ctx.t('help'));
   } catch (error) {
     if (
       error.error_code === 403 &&
